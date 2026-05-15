@@ -1,0 +1,27 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+/* Rolling placeholder animation for compact search bar in portal header */
+@keyframes navSearchRoll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.nav-search-roll {
+  display: inline-block;
+  white-space: nowrap;
+  animation: navSearchRoll 20s linear infinite;
+}
+
+/* Marquee animation for announcements ticker — culture.gov.in style */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+.animate-marquee {
+  display: inline-block;
+  animation: marquee 60s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
