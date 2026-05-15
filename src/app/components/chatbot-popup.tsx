@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChatBubble } from "./chat-bubble";
 import { SaathiAvatar } from "./saathi-avatar";
-const GOVT_EMBLEM = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Emblem_of_India.svg/250px-Emblem_of_India.svg.png";
 import { LoadingState } from "./loading-state";
 import { LanguageToggle } from "./language-toggle";
 import type { Language } from "./language-toggle";
-import { Mic, Send, Sparkles, X, Minus, Maximize2, Globe } from "lucide-react";
+import { Mic, Send, Sparkles, X, Minus, Maximize2, Globe, Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 import { findBestResponse, detectHinglish, generateGenericHinglish, type KBEntry } from "../data/knowledge-base";
 
@@ -267,14 +266,31 @@ export function ChatbotPopup() {
               <Sparkles className="h-3 w-3" />
               हेरिटेज खोजें
             </button>
-            {/* Window controls */}
-            <div className="absolute top-2 right-2 flex items-center gap-1">
+            {/* Window controls — inline flex, not absolute, to avoid overlapping the CTA pill */}
+            <div className="flex items-center gap-1 flex-shrink-0">
               <button
                 onClick={() => navigate("/chat")}
                 className="p-1 rounded-full hover:bg-white/10 transition-colors"
                 title="Open full view"
               >
                 <Maximize2 className="h-3 w-3 text-white/80" />
+              </button>
+              <button
+                onClick={() => {
+                  sessionId.current = null;
+                  setMessages([{
+                    id: "1",
+                    text: "Session cleared. Start a fresh conversation!",
+                    isUser: false,
+                    timestamp: "Just now",
+                    confidence: "High",
+                    followUps: ["Tell me about Ajanta caves", "List museums in India", "What are the Vedas?"],
+                  }]);
+                }}
+                className="p-1 rounded-full hover:bg-white/10 transition-colors"
+                title="New Session (Clear History)"
+              >
+                <Plus className="h-3 w-3 text-white/80" />
               </button>
               <button
                 onClick={() => setIsOpen(false)}
