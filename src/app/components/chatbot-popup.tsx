@@ -197,7 +197,7 @@ export function ChatbotPopup() {
     <>
       {/* Floating Chat Button — Sanskriti Saathi avatar (AskDISHA-sized) */}
       {!isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-2">
+        <div className="fixed bottom-6 right-5 z-50 flex flex-col items-center gap-2">
           <button
             onClick={() => setIsOpen(true)}
             className="relative w-24 h-24 rounded-full shadow-xl flex items-center justify-center transition-all hover:scale-105 hover:shadow-2xl overflow-hidden bg-white"
@@ -221,7 +221,7 @@ export function ChatbotPopup() {
       {isOpen && (
         <button
           onClick={() => setIsOpen(false)}
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all hover:scale-110 hover:shadow-2xl"
+          className="fixed bottom-6 right-5 z-50 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all hover:scale-110 hover:shadow-2xl"
           style={{ backgroundColor: "var(--maroon)", border: "2px solid #C9A961" }}
         >
           <X className="h-6 w-6" style={{ color: "#FFF6E5" }} />
@@ -231,11 +231,13 @@ export function ChatbotPopup() {
       {/* Popup Chat Window */}
       {isOpen && (
         <div
-          className="fixed bottom-24 right-6 z-50 w-[420px] h-[600px] rounded-2xl shadow-2xl border flex flex-col overflow-hidden"
+          className="fixed bottom-[88px] right-5 z-50 w-[400px] rounded-2xl shadow-2xl border flex flex-col overflow-hidden"
           style={{
             backgroundColor: "var(--background)",
             borderColor: "var(--border)",
             animation: "popupSlideIn 0.3s ease-out",
+            height: "min(600px, calc(100vh - 120px))",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10)",
           }}
         >
           {/* Header — maroon GoI style with cartoon avatar + CTA pill (AskDISHA-inspired) */}
@@ -259,7 +261,7 @@ export function ChatbotPopup() {
             {/* CTA pill — AskDISHA-style "टिकट बुक करें" equivalent */}
             <button
               onClick={() => navigate("/search?q=UNESCO+World+Heritage+Sites+India")}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-md hover:scale-105 transition-all"
+              className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap shadow-md hover:scale-105 transition-all"
               style={{ backgroundColor: "#fff", color: "var(--maroon)", border: "1.5px solid #C9A961" }}
               title="Explore Heritage"
             >
