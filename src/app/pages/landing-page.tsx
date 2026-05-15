@@ -623,7 +623,7 @@ export function LandingPage() {
           style={{
             display: slideIndex === 0 ? "block" : "none",
             background: "linear-gradient(135deg, #E87722 0%, #D45F0E 60%, #B84A00 100%)",
-            minHeight: "440px",
+            minHeight: "500px",
           }}
         >
           {/* Manuscript shelves backdrop texture */}
@@ -638,7 +638,7 @@ export function LandingPage() {
             </div>
           </div>
 
-          <div className="relative max-w-7xl mx-auto px-14 pt-6 pb-3 grid grid-cols-12 gap-3 items-center min-h-[420px]">
+          <div className="relative max-w-7xl mx-auto px-14 pt-6 pb-3 grid grid-cols-12 gap-3 items-center min-h-[440px]">
             {/* Left: smartphone mockup with Gyan Bharatam app */}
             <div className="col-span-12 md:col-span-3 flex justify-center">
               <div className="relative w-44 h-80 rounded-[2rem] bg-gradient-to-br from-gray-800 to-black shadow-2xl p-1.5" style={{ border: "5px solid #1a1a1a" }}>
@@ -755,13 +755,13 @@ export function LandingPage() {
           style={{
             display: slideIndex === 1 ? "block" : "none",
             background: "linear-gradient(180deg, #F5E4C8 0%, #F0D9A8 100%)",
-            minHeight: "440px",
+            minHeight: "500px",
           }}
         >
           {/* Decorative pattern */}
           <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(124,29,42,0.3) 1px, transparent 0)", backgroundSize: "20px 20px" }} />
 
-          <div className="relative max-w-7xl mx-auto px-14 py-5 grid grid-cols-12 gap-6 items-center min-h-[420px]">
+          <div className="relative max-w-7xl mx-auto px-14 py-5 grid grid-cols-12 gap-6 items-center min-h-[440px]">
             {/* Top banner: Ministry seal */}
             <div className="col-span-12 flex items-center justify-center gap-3 mb-2">
               <img src={GOVT_EMBLEM} alt="" className="w-12 h-12 object-contain" />
@@ -831,7 +831,7 @@ export function LandingPage() {
           style={{
             display: slideIndex === 2 ? "block" : "none",
             backgroundColor: "#F5E4C8",
-            minHeight: "440px",
+            minHeight: "500px",
           }}
         >
           {/* Ministry logo top-right */}
