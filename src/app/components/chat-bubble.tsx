@@ -60,21 +60,21 @@ export function ChatBubble({ text, message, isUser, timestamp, sources, confiden
 
           {/* Confidence Badge */}
           {!isUser && confidence && (
-            <div className="mt-3 pt-3 border-t flex items-center gap-4" style={{ borderColor: isUser ? 'rgba(255,255,255,0.15)' : 'var(--border)' }}>
+            <div className="mt-2.5 pt-2.5 border-t flex items-center gap-2" style={{ borderColor: 'var(--border)' }}>
               {(() => {
                 const config = confidenceConfig[confidence];
                 const Icon = config.icon;
                 return (
                   <span
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border"
                     style={{ backgroundColor: config.bg, color: config.color, borderColor: config.border }}
                   >
-                    <Icon className="h-3 w-3" />
+                    <Icon className="h-2.5 w-2.5" />
                     {config.label}
                   </span>
                 );
               })()}
-              <span className="text-[11px] opacity-40">RAG-verified response</span>
+              <span className="text-[9px] opacity-70 italic" style={{ color: 'var(--navy)' }}>✓ RAG-verified response</span>
             </div>
           )}
 

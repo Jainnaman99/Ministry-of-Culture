@@ -24,6 +24,7 @@ interface ChatHistory {
   title: string;
   preview: string;
   sessionId?: string | null;
+  savedMessages?: Message[];
 }
 
 export function ChatbotInterface() {
@@ -44,11 +45,11 @@ export function ChatbotInterface() {
   const [language, setLanguage] = useState<Language>("en");
   const [showFilters, setShowFilters] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([
-    { id: "1", title: "Ajanta Caves Heritage", preview: "Tell me about Ajanta caves" },
-    { id: "2", title: "Museums in India", preview: "List museums in India" },
-    { id: "3", title: "Classical Dance Forms", preview: "Indian classical dance forms" },
-    { id: "4", title: "Vedic Heritage", preview: "What are the Vedas?" },
-    { id: "5", title: "National Archives", preview: "About Abhilekh Patal" },
+    // { id: "1", title: "Ajanta Caves Heritage", preview: "Tell me about Ajanta caves" },
+    // { id: "2", title: "Museums in India", preview: "List museums in India" },
+    // { id: "3", title: "Classical Dance Forms", preview: "Indian classical dance forms" },
+    // { id: "4", title: "Vedic Heritage", preview: "What are the Vedas?" },
+    // { id: "5", title: "National Archives", preview: "About Abhilekh Patal" },
   ]);
 
   const sessionId = useRef<string | null>(null);
@@ -62,6 +63,22 @@ export function ChatbotInterface() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isStreaming]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("sanskriti_saathi_recents");
+      if (!stored) return;
+      const recents: { id: string; date: string; preview: string; messages: Message[] }[] = JSON.parse(stored);
+      setChatHistory(
+        recents.map((r) => ({
+          id: r.id,
+          title: r.preview.length > 30 ? r.preview.slice(0, 30) + "…" : r.preview,
+          preview: r.preview,
+          savedMessages: r.messages,
+        }))
+      );
+    } catch {}
+  }, []);
 
   // Streaming text effect
   const streamResponse = useCallback((response: KBEntry, msgId: string, userQuery: string = "") => {
@@ -162,7 +179,7 @@ export function ChatbotInterface() {
     const historyTitle = queryText.length > 30 ? queryText.slice(0, 30) + "..." : queryText;
 
     try {
-      const res = await fetch("/chat-context", {
+      const res = await fetch("/chat-hybrid-context", {
         method: "POST",
         headers: { "accept": "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ message: queryText, session_id: sessionId.current }),
@@ -237,10 +254,14 @@ export function ChatbotInterface() {
 
   const handleFollowUp = async (query: string) => {
     const item = chatHistory.find((x) => x.preview === query);
+    if (item?.savedMessages && item.savedMessages.length > 0) {
+      setMessages(item.savedMessages);
+      return;
+    }
     if (item?.sessionId && item.sessionId !== sessionId.current) {
       sessionId.current = item.sessionId;
       try {
-        const res = await fetch(`/chat-context/${item.sessionId}/history`);
+        const res = await fetch(`/chat-hybrid-context/${item.sessionId}/history`);
         if (res.ok) {
           const data = await res.json();
           const msgs = Array.isArray(data) ? data : (data.history || []);
@@ -307,7 +328,7 @@ export function ChatbotInterface() {
                   onClick={async (e) => {
                     e.stopPropagation();
                     if (chat.sessionId) {
-                      try { await fetch(`/chat-context/${chat.sessionId}`, { method: "DELETE" }); } catch {}
+                      try { await fetch(`/chat-hybrid-context/${chat.sessionId}`, { method: "DELETE" }); } catch {}
                     }
                     setChatHistory((prev) => prev.filter((x) => x.id !== chat.id));
                     if (chat.sessionId === sessionId.current) {

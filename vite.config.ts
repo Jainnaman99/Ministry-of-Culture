@@ -26,7 +26,7 @@ export default defineConfig({
   // In production this is replaced by VITE_API_BASE_URL pointing at the deployed Azure endpoint.
   server: {
     proxy: {
-      '/chat-context': {
+      '/chat-hybrid-context': {
         target: 'http://localhost:8000',
         changeOrigin: true,
       },

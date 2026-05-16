@@ -2,9 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { ChatBubble } from "./chat-bubble";
 import { SaathiAvatar } from "./saathi-avatar";
 import { LoadingState } from "./loading-state";
-import { LanguageToggle } from "./language-toggle";
 import type { Language } from "./language-toggle";
-import { Mic, Send, Sparkles, X, Minus, Maximize2, Globe, Plus } from "lucide-react";
+import { Mic, Send, Sparkles, Globe, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router";
 import { findBestResponse, detectHinglish, generateGenericHinglish, type KBEntry } from "../data/knowledge-base";
 
@@ -137,6 +136,21 @@ export function ChatbotPopup() {
     [isOpen]
   );
 
+  const saveChatToRecents = () => {
+    const userMessages = messages.filter((m) => m.isUser);
+    if (userMessages.length === 0) return;
+    const stored = localStorage.getItem("sanskriti_saathi_recents");
+    const recents: { id: string; date: string; preview: string; messages: Message[] }[] =
+      stored ? JSON.parse(stored) : [];
+    recents.unshift({
+      id: Date.now().toString(),
+      date: new Date().toISOString(),
+      preview: userMessages[0].text.slice(0, 80),
+      messages,
+    });
+    localStorage.setItem("sanskriti_saathi_recents", JSON.stringify(recents.slice(0, 20)));
+  };
+
   const handleSend = async (overrideInput?: string) => {
     const queryText = overrideInput || input;
     if (!queryText.trim() || isLoading || isStreaming) return;
@@ -153,7 +167,7 @@ export function ChatbotPopup() {
     setIsLoading(true);
 
     try {
-      const res = await fetch("/chat-context", {
+      const res = await fetch("/chat-hybrid-context", {
         method: "POST",
         headers: { "accept": "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ message: queryText, session_id: sessionId.current }),
@@ -218,95 +232,133 @@ export function ChatbotPopup() {
           </span>
         </div>
       )}
-      {isOpen && (
-        <button
-          onClick={() => setIsOpen(false)}
-          className="fixed bottom-6 right-5 z-50 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all hover:scale-110 hover:shadow-2xl"
-          style={{ backgroundColor: "var(--maroon)", border: "2px solid #C9A961" }}
-        >
-          <X className="h-6 w-6" style={{ color: "#FFF6E5" }} />
-        </button>
-      )}
 
       {/* Popup Chat Window */}
       {isOpen && (
         <div
-          className="fixed bottom-[88px] right-5 z-50 w-[400px] rounded-2xl shadow-2xl border flex flex-col overflow-hidden"
+          className="fixed bottom-6 right-5 z-50 w-[400px] rounded-2xl shadow-2xl border flex flex-col overflow-hidden"
           style={{
             backgroundColor: "var(--background)",
             borderColor: "var(--border)",
             animation: "popupSlideIn 0.3s ease-out",
-            height: "min(600px, calc(100vh - 120px))",
+            height: "min(680px, calc(100vh - 48px))",
             boxShadow: "0 8px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10)",
           }}
         >
-          {/* Header — maroon GoI style with cartoon avatar + CTA pill (AskDISHA-inspired) */}
-          <div
-            className="px-4 py-3 flex items-center justify-between flex-shrink-0 relative"
-            style={{ backgroundColor: "var(--maroon)", borderBottom: "2px solid #C9A961" }}
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="w-11 h-11 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0" style={{ backgroundColor: "#FFF6E5", border: "2px solid #C9A961" }}>
-                <SaathiAvatar size={44} />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-white leading-tight">Sanskriti Saathi</h3>
-                <p className="text-[10px] text-white/80 leading-tight">NextGen Heritage AI Assistant</p>
-                {/* <div className="flex items-center gap-1.5 mt-0.5">
-                  <div className="w-1.5 h-1.5 rounded-full animate-pulse bg-green-400"></div>
-                  <span className="text-[9px] text-white/70">Online · 66 portals indexed</span>
-                </div> */}
-              </div>
-            </div>
-            {/* CTA pill — AskDISHA-style "टिकट बुक करें" equivalent */}
-            <button
-              onClick={() => navigate("/search?q=UNESCO+World+Heritage+Sites+India")}
-              className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap shadow-md hover:scale-105 transition-all"
-              style={{ backgroundColor: "#fff", color: "var(--maroon)", border: "1.5px solid #C9A961" }}
-              title="Explore Heritage"
-            >
-              <Sparkles className="h-3 w-3" />
-              हेरिटेज खोजें
-            </button>
-            {/* Window controls — inline flex, not absolute, to avoid overlapping the CTA pill */}
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <button
-                onClick={() => navigate("/chat")}
-                className="p-1 rounded-full hover:bg-white/10 transition-colors"
-                title="Open full view"
-              >
-                <Maximize2 className="h-3 w-3 text-white/80" />
-              </button>
-              <button
-                onClick={() => {
-                  sessionId.current = null;
-                  setMessages([{
-                    id: "1",
-                    text: "Session cleared. Start a fresh conversation!",
-                    isUser: false,
-                    timestamp: "Just now",
-                    confidence: "High",
-                    followUps: ["Tell me about Ajanta caves", "List museums in India", "What are the Vedas?"],
-                  }]);
-                }}
-                className="p-1 rounded-full hover:bg-white/10 transition-colors"
-                title="New Session (Clear History)"
-              >
-                <Plus className="h-3 w-3 text-white/80" />
-              </button>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1 rounded-full hover:bg-white/10 transition-colors"
-                title="Minimize"
-              >
-                <Minus className="h-3 w-3 text-white/80" />
-              </button>
-            </div>
-          </div>
+          {/* Header */}
+          <div className="flex-shrink-0" style={{ backgroundColor: "var(--maroon)", borderBottom: "2px solid #C9A961" }}>
+            {/* Row 1 — Identity */}
+            <div className="px-4 pt-3 pb-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0" style={{ backgroundColor: "#FFF6E5", border: "2px solid #C9A961" }}>
+                    <SaathiAvatar size={48} />
+                  </div>
+                  <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-400 border-2 border-white"></span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white leading-tight">Sanskriti Saathi</h3>
+                  <p className="text-[10px] leading-tight" style={{ color: "#C9A961" }}>NextGen Heritage AI Assistant</p>
 
-          {/* Language Toggle */}
-          <div className="px-3 py-2 border-b flex justify-center" style={{ borderColor: "var(--border)", backgroundColor: "#fff" }}>
-            <LanguageToggle language={language} onToggle={setLanguage} />
+                </div>
+              </div>
+              {/* CTA pill + Minimize */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navigate("/search?q=UNESCO+World+Heritage+Sites+India")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap shadow-lg hover:scale-105 hover:shadow-xl transition-all"
+                  style={{ background: "linear-gradient(135deg, #C9A961, #e8c97a)", color: "var(--maroon)" }}
+                  title="Explore Heritage"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  हेरिटेज खोजें
+                </button>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                  style={{ backgroundColor: "rgba(255,255,255,0.15)", color: "#ffffff" }}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.28)")}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.15)")}
+                  title="Minimize chat"
+                  aria-label="Minimize chat"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Row 2 — Action strip */}
+            <div
+              className="px-3 py-1.5 flex items-center justify-between gap-2"
+              style={{ borderTop: "1px solid rgba(255,255,255,0.12)", backgroundColor: "rgba(0,0,0,0.18)" }}
+            >
+              {/* Language selector */}
+              <div className="flex items-center gap-1.5">
+                <Globe className="h-3 w-3 flex-shrink-0" style={{ color: "#e8c97a" }} />
+                <div className="flex items-center rounded-full overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.35)" }}>
+                  {([
+                    { code: "en" as Language, label: "EN" },
+                    { code: "hi" as Language, label: "हि" },
+                    { code: "te" as Language, label: "తె" },
+                    { code: "ta" as Language, label: "த" },
+                  ]).map((lang, i, arr) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => setLanguage(lang.code)}
+                      className="px-2 py-0.5 text-[10px] font-bold transition-all"
+                      style={{
+                        backgroundColor: language === lang.code ? "#e8c97a" : "transparent",
+                        color: language === lang.code ? "var(--maroon)" : "#ffffff",
+                        borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.25)" : "none",
+                      }}
+                    >
+                      {lang.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="w-px h-4 bg-white/40 flex-shrink-0" />
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => navigate("/chat")}
+                  className="flex items-center gap-1 text-[10px] font-bold transition-colors"
+                  style={{ color: "#e8c97a" }}
+                  onMouseEnter={e => (e.currentTarget.style.color = "#ffffff")}
+                  onMouseLeave={e => (e.currentTarget.style.color = "#e8c97a")}
+                  title="Open full view"
+                >
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  Full View
+                </button>
+                <div className="w-px h-3 bg-white/40" />
+                <button
+                  onClick={() => {
+                    saveChatToRecents();
+                    sessionId.current = null;
+                    setMessages([{
+                      id: "1",
+                      text: "Chat saved to Recents. Start a fresh conversation!",
+                      isUser: false,
+                      timestamp: "Just now",
+                      confidence: "High",
+                      followUps: ["Tell me about Ajanta caves", "List museums in India", "What are the Vedas?"],
+                    }]);
+                  }}
+                  className="flex items-center gap-1 text-[10px] font-bold transition-colors"
+                  style={{ color: "#e8c97a" }}
+                  onMouseEnter={e => (e.currentTarget.style.color = "#ffffff")}
+                  onMouseLeave={e => (e.currentTarget.style.color = "#e8c97a")}
+                  title="Save chat to Recents and start fresh"
+                >
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.43"/></svg>
+                  Clear Chat
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Messages */}
