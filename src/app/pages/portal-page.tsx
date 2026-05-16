@@ -18,6 +18,7 @@ import {
   Monitor,
   MapPin,
   Clock,
+  Sparkles,
 } from "lucide-react";
 
 const quickLinks = [
@@ -134,7 +135,7 @@ export function PortalPage() {
           {/* AI-Powered Search — compact bar in header */}
           <div className="flex-1 max-w-2xl mx-4 flex flex-col">
             <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--maroon)" }}>
-              <Search className="h-3.5 w-3.5" />
+              <Sparkles className="h-3.5 w-3.5" />
               AI-Powered Search
             </div>
             <AISearchBar onSearch={handleSearch} compact />
