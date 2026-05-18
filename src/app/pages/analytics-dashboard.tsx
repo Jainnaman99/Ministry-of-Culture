@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 import {
   ArrowLeft,
@@ -6,7 +6,7 @@ import {
   TrendingDown,
   Users,
   Globe,
-  BarChart3,
+  // BarChart3,
   Activity,
   Clock,
   Shield,
@@ -15,21 +15,21 @@ import {
   FileText,
   Search,
   MessageSquare,
-  Eye,
+  // Eye,
   RefreshCw,
   Database,
   Cpu,
   CheckCircle2,
-  AlertTriangle,
-  ArrowUpRight,
+  // AlertTriangle,
+  // ArrowUpRight,
   Layers,
   Monitor
 } from "lucide-react";
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
+  // BarChart,
+  // Bar,
   AreaChart,
   Area,
   XAxis,
@@ -40,12 +40,42 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend
+  // Legend
 } from "recharts";
+
+interface KpiData {
+  total_queries:      { today: number; yesterday: number; change_pct: number };
+  active_users:       { active_30min: number; concurrent_5min: number };
+  avg_response_time:  { mean_seconds: number; p95_seconds: number; change_pct: number };
+  rag_accuracy:       { pct: number; vector_hits: number; total_non_conversational: number };
+  chatbot_sessions:   { today: number; avg_turns: number };
+  system_uptime:      { uptime_seconds: number; uptime_human: string; started_at: string };
+}
 
 export function AnalyticsDashboard() {
   const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState<"today" | "week" | "month">("today");
+  const [kpis, setKpis] = useState<KpiData | null>(null);
+  const [kpisLoading, setKpisLoading] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState(new Date());
+
+  const fetchKpis = useCallback(() => {
+    setKpisLoading(true);
+    fetch("/metrics/kpis", { headers: { accept: "application/json" } })
+      .then((r) => r.json())
+      .then((data: KpiData) => {
+        setKpis(data);
+        setLastRefreshed(new Date());
+      })
+      .catch(() => {/* keep previous data on error */})
+      .finally(() => setKpisLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetchKpis();
+    const interval = setInterval(fetchKpis, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchKpis]);
 
   // --- DATA ---
   const queriesOverTime = [
@@ -253,7 +283,74 @@ export function AnalyticsDashboard() {
     ],
   };
 
-  const stats = statsData[timeRange];
+  const n = (v: number | null | undefined, fallback = 0) => v ?? fallback;
+
+  const fmtChange = (pct: number | null | undefined, lowerIsBetter = false) => {
+    const safe = n(pct);
+    const up = lowerIsBetter ? safe <= 0 : safe >= 0;
+    const label = `${safe >= 0 ? "+" : ""}${safe.toFixed(1)}%`;
+    return { change: label, up };
+  };
+
+  const liveStats = kpis
+    ? [
+        {
+          title: "Total Queries",
+          value: n(kpis.total_queries.today).toLocaleString("en-IN"),
+          ...fmtChange(kpis.total_queries.change_pct),
+          icon: Search,
+          subtitle: `yesterday: ${n(kpis.total_queries.yesterday).toLocaleString("en-IN")}`,
+        },
+        {
+          title: "Active Users",
+          value: n(kpis.active_users.active_30min).toLocaleString("en-IN"),
+          change: "–",
+          up: true,
+          icon: Users,
+          subtitle: `concurrent (5 min): ${n(kpis.active_users.concurrent_5min)}`,
+        },
+        {
+          title: "Avg Response Time",
+          value: `${n(kpis.avg_response_time.mean_seconds).toFixed(2)}s`,
+          ...fmtChange(kpis.avg_response_time.change_pct, true),
+          icon: Zap,
+          subtitle: `P95: ${n(kpis.avg_response_time.p95_seconds).toFixed(2)}s`,
+        },
+        {
+          title: "RAG Accuracy",
+          value: `${n(kpis.rag_accuracy.pct).toFixed(1)}%`,
+          change: "–",
+          up: true,
+          icon: Shield,
+          subtitle: `${n(kpis.rag_accuracy.vector_hits)} / ${n(kpis.rag_accuracy.total_non_conversational)} verified`,
+        },
+        {
+          title: "Chatbot Sessions",
+          value: n(kpis.chatbot_sessions.today).toLocaleString("en-IN"),
+          change: "–",
+          up: true,
+          icon: MessageSquare,
+          subtitle: `avg ${n(kpis.chatbot_sessions.avg_turns).toFixed(1)} turns`,
+        },
+        {
+          title: "System Uptime",
+          value: kpis.system_uptime.uptime_human ?? "–",
+          change: "–",
+          up: true,
+          icon: Server,
+          subtitle: kpis.system_uptime.started_at ? `since ${new Date(kpis.system_uptime.started_at).toLocaleDateString("en-IN")}` : "–",
+        },
+      ]
+    : [
+        { title: "Total Queries",     value: "–", change: "–", up: true, icon: Search,       subtitle: "loading…" },
+        { title: "Active Users",      value: "–", change: "–", up: true, icon: Users,        subtitle: "loading…" },
+        { title: "Avg Response Time", value: "–", change: "–", up: true, icon: Zap,          subtitle: "loading…" },
+        { title: "RAG Accuracy",      value: "–", change: "–", up: true, icon: Shield,       subtitle: "loading…" },
+        { title: "Chatbot Sessions",  value: "–", change: "–", up: true, icon: MessageSquare, subtitle: "loading…" },
+        { title: "System Uptime",     value: "–", change: "–", up: true, icon: Server,       subtitle: "loading…" },
+      ];
+
+  const stats = timeRange === "today" ? liveStats : statsData[timeRange];
   const chartData = timeRange === "today" ? queriesOverTime : timeRange === "week" ? weeklyData : monthlyData;
   const responseTimeData = timeRange === "today" ? responseTimeToday : timeRange === "week" ? responseTimeWeekly : responseTimeMonthly;
   const topTopics = topTopicsData[timeRange];
@@ -274,10 +371,16 @@ export function AnalyticsDashboard() {
               <span className="opacity-60">Ministry of Culture</span>
             </div>
             <div className="flex items-center gap-4">
-              <span className="opacity-60">Last updated: {new Date().toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short', year: 'numeric' })}</span>
-              <button className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
-                <RefreshCw className="h-3 w-3" />
-                Refresh
+              <span className="opacity-60">
+                Last updated: {lastRefreshed.toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short', year: 'numeric' })}
+              </span>
+              <button
+                onClick={fetchKpis}
+                disabled={kpisLoading}
+                className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity disabled:cursor-not-allowed"
+              >
+                <RefreshCw className={`h-3 w-3 ${kpisLoading ? "animate-spin" : ""}`} />
+                {kpisLoading ? "Loading…" : "Refresh"}
               </button>
             </div>
           </div>
