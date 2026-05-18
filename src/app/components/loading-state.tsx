@@ -24,7 +24,7 @@ export function LoadingState({ message = "Searching..." }: LoadingStateProps) {
   useEffect(() => {
     const interval = setInterval(() => {
       setFactIndex((i) => (i + 1) % HERITAGE_FACTS.length);
-    }, 3000);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
