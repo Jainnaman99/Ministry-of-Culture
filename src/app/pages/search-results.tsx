@@ -5,7 +5,7 @@ import { AISearchBar } from "../components/ai-search-bar";
 import { EmptyState } from "../components/empty-state";
 import { ChatbotPopup } from "../components/chatbot-popup";
 import { LoadingState } from "../components/loading-state";
-import { ArrowLeft, Filter, Sparkles, Clock, Globe, MessageSquare, ChevronRight, Shield } from "lucide-react";
+import { ArrowLeft, Filter, Sparkles, Clock, Globe, MessageSquare, ChevronRight, ChevronLeft, Shield } from "lucide-react";
 
 interface SearchResult {
   id: string;
@@ -218,6 +218,25 @@ const searchEntries: SearchEntry[] = [
   },
 ];
 
+// ===== URL → readable source label =====
+function sourceFromUrl(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    const map: Record<string, string> = {
+      "culture.gov.in":          "Ministry of Culture",
+      "indianculture.gov.in":    "Indian Culture Portal",
+      "asi.nic.in":              "Archaeological Survey of India",
+      "museumsofindia.gov.in":   "Museums of India",
+      "vedicheritage.gov.in":    "Vedic Heritage Portal",
+      "nationalarchives.nic.in": "National Archives of India",
+      "ignca.gov.in":            "IGNCA",
+    };
+    return map[host] ?? host;
+  } catch {
+    return url;
+  }
+}
+
 // ===== SMART SEARCH FUNCTION =====
 function findSearchResults(query: string): { results: SearchResult[]; summary: string; relatedQueries: string[] } {
   const lowerQ = query.toLowerCase()
@@ -272,29 +291,82 @@ export function SearchResults() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
+  const page  = parseInt(searchParams.get("page") || "1", 10);
 
   const [isLoading, setIsLoading] = useState(true);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [aiSummary, setAiSummary] = useState("");
   const [relatedQueries, setRelatedQueries] = useState<string[]>([]);
   const [filters, setFilters] = useState({ website: "all", contentType: "all", dateRange: "all" });
-  const [searchTime] = useState((0.4 + Math.random() * 0.8).toFixed(2));
+  const [searchTime, setSearchTime] = useState((0.4 + Math.random() * 0.8).toFixed(2));
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
 
   useEffect(() => {
-    if (query) {
-      setIsLoading(true);
-      setTimeout(() => {
-        const data = findSearchResults(query);
-        setResults(data.results);
-        setAiSummary(data.summary);
-        setRelatedQueries(data.relatedQueries);
+    if (!query) return;
+    setIsLoading(true);
+
+    fetch("/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, page, page_size: 10 }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("API error");
+        return res.json();
+      })
+      .then((data) => {
+        const seen = new Set<string>();
+        const mapped: SearchResult[] = (data.results ?? [])
+          .filter((r: { url?: string }) => {
+            if (!r.url || seen.has(r.url)) return false;
+            seen.add(r.url);
+            return true;
+          })
+          .map((r: { title?: string; text?: string; url?: string }, i: number) => ({
+            id: String(i + 1),
+            title: r.title ?? "",
+            summary: r.text ?? "",
+            url: r.url ?? "",
+            source: sourceFromUrl(r.url ?? ""),
+            keywords: [],
+          }));
+        setResults(mapped);
+        setAiSummary(data.answer ?? data.summary ?? "");
+        setRelatedQueries(data.relatedQueries ?? []);
+        setTotalPages(data.total_pages ?? 1);
+        setTotalResults(data.total_results ?? 0);
+        if (data.response_time_seconds != null) {
+          setSearchTime(Number(data.response_time_seconds).toFixed(2));
+        }
         setIsLoading(false);
-      }, 600 + Math.random() * 400);
-    }
-  }, [query]);
+      })
+      .catch(() => {
+        const fallback = findSearchResults(query);
+        setResults(fallback.results);
+        setAiSummary(fallback.summary);
+        setRelatedQueries(fallback.relatedQueries);
+        setIsLoading(false);
+      });
+  }, [query, page]);
 
   const handleNewSearch = (newQuery: string) => {
     navigate(`/search?q=${encodeURIComponent(newQuery)}`);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    navigate(`/search?q=${encodeURIComponent(query)}&page=${newPage}`);
+  };
+
+  const pageNumbers = (): (number | "…")[] => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const nums: (number | "…")[] = [1];
+    if (page > 3) nums.push("…");
+    for (let p = Math.max(2, page - 1); p <= Math.min(totalPages - 1, page + 1); p++) nums.push(p);
+    if (page < totalPages - 2) nums.push("…");
+    nums.push(totalPages);
+    return nums;
   };
 
   return (
@@ -403,13 +475,13 @@ export function SearchResults() {
                   <span>•</span>
                   <span className="flex items-center gap-1"><Globe className="h-3 w-3" />66 portals searched</span>
                   <span>•</span>
-                  <span>{results.length} results found</span>
+                  <span>{totalResults > 0 ? totalResults : results.length} results found</span>
                 </div>
               )}
             </div>
 
             {/* AI Summary */}
-            {!isLoading && (
+            {!isLoading && aiSummary && (
               <div className="mb-6 p-5 rounded-xl border-l-4 bg-white shadow-sm" style={{ borderLeftColor: "var(--gold)" }}>
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(198,167,94,0.12)" }}>
@@ -439,6 +511,52 @@ export function SearchResults() {
               </div>
             ) : (
               <EmptyState suggestions={["Indian classical dance", "Museums in Delhi", "Historical monuments"]} />
+            )}
+
+            {/* Pagination */}
+            {!isLoading && totalPages > 1 && (
+              <div className="mt-6 flex items-center justify-center gap-2">
+                <button
+                  onClick={() => handlePageChange(page - 1)}
+                  disabled={page <= 1}
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg border text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:border-[var(--gold)] hover:bg-[var(--muted)]"
+                  style={{ borderColor: "var(--border)", color: "var(--navy)" }}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  Prev
+                </button>
+
+                <div className="flex gap-1">
+                  {pageNumbers().map((p, i) =>
+                    p === "…" ? (
+                      <span key={`ellipsis-${i}`} className="w-9 h-9 flex items-center justify-center text-sm" style={{ color: "var(--muted-foreground)" }}>…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => handlePageChange(p as number)}
+                        className="w-9 h-9 rounded-lg text-sm font-medium transition-all"
+                        style={{
+                          backgroundColor: p === page ? "var(--navy)" : "transparent",
+                          color: p === page ? "var(--ivory)" : "var(--navy)",
+                          border: p === page ? "none" : "1px solid var(--border)",
+                        }}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                </div>
+
+                <button
+                  onClick={() => handlePageChange(page + 1)}
+                  disabled={page >= totalPages}
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg border text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:border-[var(--gold)] hover:bg-[var(--muted)]"
+                  style={{ borderColor: "var(--border)", color: "var(--navy)" }}
+                >
+                  Next
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             )}
 
             {/* Related Searches */}
