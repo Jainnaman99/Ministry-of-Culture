@@ -37,6 +37,7 @@ export function ChatbotPopup() {
   const [language, setLanguage] = useState<Language>("en");
   const [unreadCount, setUnreadCount] = useState(0);
   const sessionId = useRef<string | null>(null);
+  const localChatId = useRef<string | null>(null); // deduplication key only — never sent to API
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -139,21 +140,30 @@ export function ChatbotPopup() {
   const saveChatToRecents = () => {
     const userMessages = messages.filter((m) => m.isUser);
     if (userMessages.length === 0) return;
+    const preview = userMessages[0].text.slice(0, 80);
+    // localChatId is the stable recents slot identity — sessionId is API-only and never used here
+    const chatKey = localChatId.current;
     const stored = localStorage.getItem("sanskriti_saathi_recents");
-    const recents: { id: string; date: string; preview: string; messages: Message[] }[] =
+    const recents: { id: string; date: string; preview: string; messages: Message[]; sessionId?: string | null }[] =
       stored ? JSON.parse(stored) : [];
-    recents.unshift({
+    const deduped = chatKey
+      ? recents.filter((r) => r.sessionId !== chatKey)
+      : recents;
+    deduped.unshift({
       id: Date.now().toString(),
       date: new Date().toISOString(),
-      preview: userMessages[0].text.slice(0, 80),
+      preview,
       messages,
+      sessionId: chatKey,
     });
-    localStorage.setItem("sanskriti_saathi_recents", JSON.stringify(recents.slice(0, 20)));
+    localStorage.setItem("sanskriti_saathi_recents", JSON.stringify(deduped.slice(0, 20)));
   };
 
   const handleSend = async (overrideInput?: string) => {
     const queryText = overrideInput || input;
     if (!queryText.trim() || isLoading || isStreaming) return;
+
+    if (!localChatId.current) localChatId.current = "chat_" + Date.now();
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -324,7 +334,13 @@ export function ChatbotPopup() {
               {/* Action buttons */}
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => navigate("/chat")}
+                  onClick={() => {
+                    localStorage.setItem(
+                      "sanskriti_saathi_active_chat",
+                      JSON.stringify({ messages, sessionId: sessionId.current, localChatId: localChatId.current })
+                    );
+                    navigate("/chat");
+                  }}
                   className="flex items-center gap-1 text-[10px] font-bold transition-colors"
                   style={{ color: "#e8c97a" }}
                   onMouseEnter={e => (e.currentTarget.style.color = "#ffffff")}
@@ -339,6 +355,7 @@ export function ChatbotPopup() {
                   onClick={() => {
                     saveChatToRecents();
                     sessionId.current = null;
+                    localChatId.current = null;
                     setMessages([{
                       id: "1",
                       text: "Chat saved to Recents. Start a fresh conversation!",

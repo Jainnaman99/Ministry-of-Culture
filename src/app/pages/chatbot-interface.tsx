@@ -23,7 +23,8 @@ interface ChatHistory {
   id: string;
   title: string;
   preview: string;
-  sessionId?: string | null;
+  sessionId?: string | null;     // localChatId — deduplication key
+  apiSessionId?: string | null;  // real backend session ID — for continuing conversation
   savedMessages?: Message[];
 }
 
@@ -53,6 +54,9 @@ export function ChatbotInterface() {
   ]);
 
   const sessionId = useRef<string | null>(null);
+  const localChatId = useRef<string | null>(null);         // deduplication key — never sent to API
+  const currentRecentEntryId = useRef<string | null>(null); // id of the recents entry being viewed/edited
+  const hasNewMessages = useRef<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -65,18 +69,36 @@ export function ChatbotInterface() {
   }, [messages, isStreaming]);
 
   useEffect(() => {
+    // Load saved recents into sidebar
     try {
       const stored = localStorage.getItem("sanskriti_saathi_recents");
-      if (!stored) return;
-      const recents: { id: string; date: string; preview: string; messages: Message[] }[] = JSON.parse(stored);
-      setChatHistory(
-        recents.map((r) => ({
-          id: r.id,
-          title: r.preview.length > 30 ? r.preview.slice(0, 30) + "…" : r.preview,
-          preview: r.preview,
-          savedMessages: r.messages,
-        }))
-      );
+      if (stored) {
+        const recents: { id: string; date: string; preview: string; messages: Message[]; sessionId?: string | null; apiSessionId?: string | null }[] = JSON.parse(stored);
+        setChatHistory(
+          recents.map((r) => ({
+            id: r.id,
+            title: r.preview.length > 30 ? r.preview.slice(0, 30) + "…" : r.preview,
+            preview: r.preview,
+            sessionId: r.sessionId,
+            apiSessionId: r.apiSessionId,
+            savedMessages: r.messages,
+          }))
+        );
+      }
+    } catch {}
+
+    // Restore in-progress chat handed off via "Full View" button
+    try {
+      const active = localStorage.getItem("sanskriti_saathi_active_chat");
+      if (active) {
+        const { messages: saved, sessionId: savedSession, localChatId: savedLocalId } = JSON.parse(active);
+        if (Array.isArray(saved) && saved.length > 0) {
+          setMessages(saved);
+          if (savedSession) sessionId.current = savedSession;
+          if (savedLocalId) localChatId.current = savedLocalId;
+        }
+        localStorage.removeItem("sanskriti_saathi_active_chat");
+      }
     } catch {}
   }, []);
 
@@ -165,6 +187,9 @@ export function ChatbotInterface() {
     const queryText = overrideInput || input;
     if (!queryText.trim() || isLoading || isStreaming) return;
 
+    if (!localChatId.current) localChatId.current = "chat_" + Date.now();
+    hasNewMessages.current = true;
+
     const userMessage: Message = {
       id: Date.now().toString(),
       text: queryText,
@@ -176,8 +201,6 @@ export function ChatbotInterface() {
     setInput("");
     setIsLoading(true);
 
-    const historyTitle = queryText.length > 30 ? queryText.slice(0, 30) + "..." : queryText;
-
     try {
       const res = await fetch("/chat-hybrid-context", {
         method: "POST",
@@ -188,12 +211,6 @@ export function ChatbotInterface() {
       const data = await res.json();
       if (data.session_id) sessionId.current = data.session_id;
       setIsLoading(false);
-
-      setChatHistory((prev) => {
-        const exists = prev.some((h) => h.preview.toLowerCase() === queryText.toLowerCase());
-        if (exists) return prev;
-        return [{ id: Date.now().toString(), title: historyTitle, preview: queryText, sessionId: sessionId.current }, ...prev].slice(0, 10);
-      });
 
       const msgId = (Date.now() + 1).toString();
       const sources = (data.sources || []).map((s: any) => ({ title: s.title, url: s.link, snippet: s.snippet }));
@@ -212,12 +229,6 @@ export function ChatbotInterface() {
     } catch {
       setIsLoading(false);
 
-      setChatHistory((prev) => {
-        const exists = prev.some((h) => h.preview.toLowerCase() === queryText.toLowerCase());
-        if (exists) return prev;
-        return [{ id: Date.now().toString(), title: historyTitle, preview: queryText, sessionId: null }, ...prev].slice(0, 10);
-      });
-
       const response = findBestResponse(queryText);
       const msgId = (Date.now() + 1).toString();
       const aiMessage: Message = {
@@ -232,8 +243,51 @@ export function ChatbotInterface() {
     }
   };
 
+  const saveChatToRecents = (msgs: Message[]) => {
+    const userMessages = msgs.filter((m) => m.isUser);
+    if (userMessages.length === 0) return;
+    try {
+      const preview = userMessages[0].text.slice(0, 80);
+      // localChatId is the stable identity of this recents slot — never changes even if
+      // the API returns a new session_id mid-conversation or a sidebar recent is continued
+      const chatKey = localChatId.current;
+      const stored = localStorage.getItem("sanskriti_saathi_recents");
+      const recents: { id: string; date: string; preview: string; messages: Message[]; sessionId?: string | null; apiSessionId?: string | null }[] =
+        stored ? JSON.parse(stored) : [];
+      const deduped = recents.filter((r) => {
+        if (chatKey && r.sessionId === chatKey) return false;
+        if (currentRecentEntryId.current && r.id === currentRecentEntryId.current) return false;
+        return true;
+      });
+      deduped.unshift({
+        id: Date.now().toString(),
+        date: new Date().toISOString(),
+        preview,
+        messages: msgs,
+        sessionId: chatKey,
+        apiSessionId: sessionId.current,
+      });
+      const final = deduped.slice(0, 20);
+      localStorage.setItem("sanskriti_saathi_recents", JSON.stringify(final));
+      setChatHistory(
+        final.map((r) => ({
+          id: r.id,
+          title: r.preview.length > 30 ? r.preview.slice(0, 30) + "…" : r.preview,
+          preview: r.preview,
+          sessionId: r.sessionId,
+          apiSessionId: r.apiSessionId,
+          savedMessages: r.messages,
+        }))
+      );
+    } catch {}
+  };
+
   const handleNewChat = () => {
+    if (hasNewMessages.current) saveChatToRecents(messages);
+    hasNewMessages.current = false;
     sessionId.current = null;
+    localChatId.current = null;
+    currentRecentEntryId.current = null;
     setMessages([
       {
         id: Date.now().toString(),
@@ -252,33 +306,20 @@ export function ChatbotInterface() {
     ]);
   };
 
-  const handleFollowUp = async (query: string) => {
-    const item = chatHistory.find((x) => x.preview === query);
-    if (item?.savedMessages && item.savedMessages.length > 0) {
+  const handleRestoreChat = (chatId: string) => {
+    const item = chatHistory.find((x) => x.id === chatId);
+    if (!item) return;
+    // Save current chat before switching if it has unsaved messages
+    if (hasNewMessages.current) {
+      saveChatToRecents(messages);
+      hasNewMessages.current = false;
+    }
+    if (item.savedMessages && item.savedMessages.length > 0) {
       setMessages(item.savedMessages);
-      return;
+      localChatId.current = item.sessionId || null;
+      sessionId.current = item.apiSessionId || null;
+      currentRecentEntryId.current = item.id;
     }
-    if (item?.sessionId && item.sessionId !== sessionId.current) {
-      sessionId.current = item.sessionId;
-      try {
-        const res = await fetch(`/chat-hybrid-context/${item.sessionId}/history`);
-        if (res.ok) {
-          const data = await res.json();
-          const msgs = Array.isArray(data) ? data : (data.history || []);
-          setMessages([
-            { id: "1", text: "Conversation history restored.", isUser: false, timestamp: "Just now", confidence: "High", followUps: [] },
-            ...msgs.map((m: any, idx: number) => ({
-              id: (idx + 2).toString(),
-              text: m.content || m.message || "",
-              isUser: m.role === "user",
-              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            })),
-          ]);
-          return;
-        }
-      } catch {}
-    }
-    handleSend(query);
   };
 
   return (
@@ -318,7 +359,7 @@ export function ChatbotInterface() {
             {chatHistory.map((chat) => (
               <div key={chat.id} className="flex items-center gap-1 group">
                 <button
-                  onClick={() => handleFollowUp(chat.preview)}
+                  onClick={() => handleRestoreChat(chat.id)}
                   className="flex-1 text-left px-3 py-2.5 rounded-lg transition-all hover:bg-[var(--sidebar-accent)] min-w-0"
                 >
                   <p className="text-sm mb-0.5 truncate" style={{ color: "var(--sidebar-foreground)" }}>{chat.title}</p>
@@ -330,9 +371,20 @@ export function ChatbotInterface() {
                     if (chat.sessionId) {
                       try { await fetch(`/chat-hybrid-context/${chat.sessionId}`, { method: "DELETE" }); } catch {}
                     }
-                    setChatHistory((prev) => prev.filter((x) => x.id !== chat.id));
-                    if (chat.sessionId === sessionId.current) {
+                    setChatHistory((prev) => {
+                      const updated = prev.filter((x) => x.id !== chat.id);
+                      try {
+                        const stored = localStorage.getItem("sanskriti_saathi_recents");
+                        if (stored) {
+                          const recents = JSON.parse(stored).filter((r: { sessionId?: string }) => r.sessionId !== chat.sessionId);
+                          localStorage.setItem("sanskriti_saathi_recents", JSON.stringify(recents));
+                        }
+                      } catch {}
+                      return updated;
+                    });
+                    if (chat.sessionId === sessionId.current || chat.sessionId === localChatId.current) {
                       sessionId.current = null;
+                      localChatId.current = null;
                       handleNewChat();
                     }
                   }}
@@ -412,7 +464,7 @@ export function ChatbotInterface() {
                     {message.followUps.map((fq, i) => (
                       <button
                         key={i}
-                        onClick={() => handleFollowUp(fq)}
+                        onClick={() => handleSend(fq)}
                         disabled={isLoading || isStreaming}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border-2 transition-all hover:shadow-sm hover:bg-white disabled:opacity-40"
                         style={{ borderColor: "var(--maroon)", color: "var(--maroon)", backgroundColor: "#FFF6E5" }}
