@@ -1,5 +1,5 @@
 import { cn } from "../components/ui/utils";
-import { User, ExternalLink, ShieldCheck, ShieldAlert, Shield } from "lucide-react";
+import { User, ExternalLink } from "lucide-react";
 import { SaathiAvatar } from "./saathi-avatar";
 
 interface ChatBubbleProps {
@@ -8,7 +8,7 @@ interface ChatBubbleProps {
   isUser: boolean;
   timestamp?: string;
   sources?: { title: string; url: string }[];
-  confidence?: "High" | "Medium" | "Low";
+
   id?: string;
 }
 
@@ -22,15 +22,9 @@ function renderFormattedText(text: string) {
   });
 }
 
-export function ChatBubble({ text, message, isUser, timestamp, sources, confidence }: ChatBubbleProps) {
+export function ChatBubble({ text, message, isUser, timestamp, sources }: ChatBubbleProps) {
   const content = text || message || "";
 
-  // Confidence badges — palette-matched (cream/maroon for High, amber for Medium, red for Low)
-  const confidenceConfig = {
-    High: { icon: ShieldCheck, color: "var(--maroon)", bg: "#FFF6E5", border: "var(--maroon)", label: "High Confidence" },
-    Medium: { icon: Shield, color: "#92400e", bg: "#fef3c7", border: "#92400e", label: "Medium Confidence" },
-    Low: { icon: ShieldAlert, color: "#991b1b", bg: "#fee2e2", border: "#991b1b", label: "Low Confidence" },
-  };
 
   return (
     <div className={cn("flex w-full mb-5 gap-3", isUser ? "justify-end" : "justify-start")}>
@@ -58,27 +52,7 @@ export function ChatBubble({ text, message, isUser, timestamp, sources, confiden
         >
           <p className="whitespace-pre-wrap leading-relaxed text-[14px]">{renderFormattedText(content)}</p>
 
-          {/* Confidence Badge */}
-          {!isUser && confidence && (
-            <div className="mt-2.5 pt-2.5 border-t flex items-center gap-2" style={{ borderColor: 'var(--border)' }}>
-              {(() => {
-                const config = confidenceConfig[confidence];
-                const Icon = config.icon;
-                return (
-                  <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border"
-                    style={{ backgroundColor: config.bg, color: config.color, borderColor: config.border }}
-                  >
-                    <Icon className="h-2.5 w-2.5" />
-                    {config.label}
-                  </span>
-                );
-              })()}
-              <span className="text-[9px] opacity-70 italic" style={{ color: 'var(--navy)' }}>✓ RAG-verified response</span>
-            </div>
-          )}
-
-          {/* Sources */}
+{/* Sources */}
           {!isUser && sources && sources.length > 0 && (
             <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
               <details className="cursor-pointer group">
