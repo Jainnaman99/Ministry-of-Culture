@@ -59,6 +59,8 @@ export function AnalyticsDashboard() {
   const [kpisLoading, setKpisLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [trafficChartData, setTrafficChartData] = useState<{ time: string; queries: number; users: number }[]>([]);
+  const [responseTimeChartData, setResponseTimeChartData] = useState<{ time: string; avg: number | null; p95: number | null }[]>([]);
+  const [slaThreshold, setSlaThreshold] = useState(3.0);
 
   const fetchKpis = useCallback(() => {
     setKpisLoading(true);
@@ -87,12 +89,27 @@ export function AnalyticsDashboard() {
       .catch(() => {/* keep previous data on error */});
   }, []);
 
+  const fetchResponseTime = useCallback(() => {
+    fetch("/metrics/response-time", { headers: { accept: "application/json" } })
+      .then((r) => r.json())
+      .then((data: { labels: string[]; avg: (number | null)[]; p95: (number | null)[]; sla_threshold?: number }) => {
+        setResponseTimeChartData(
+          data.labels.map((time, i) => ({
+            time,
+            avg: data.avg[i] ?? null,
+            p95: data.p95[i] ?? null,
+          }))
+        );
+        if (data.sla_threshold != null) setSlaThreshold(data.sla_threshold);
+      })
+      .catch(() => {/* keep previous data on error */});
+  }, []);
+
   useEffect(() => {
     fetchKpis();
     fetchTraffic();
-    const interval = setInterval(() => { fetchKpis(); fetchTraffic(); }, 30_000);
-    return () => clearInterval(interval);
-  }, [fetchKpis, fetchTraffic]);
+    fetchResponseTime();
+  }, [fetchKpis, fetchTraffic, fetchResponseTime]);
 
   // --- DATA ---
 
@@ -195,18 +212,6 @@ export function AnalyticsDashboard() {
     ],
   };
 
-  const responseTimeToday = [
-    { time: "00:00", avg: 1.1, p95: 2.1 },
-    { time: "04:00", avg: 0.9, p95: 1.8 },
-    { time: "08:00", avg: 1.3, p95: 2.4 },
-    { time: "10:00", avg: 1.5, p95: 2.7 },
-    { time: "12:00", avg: 1.8, p95: 2.9 },
-    { time: "14:00", avg: 1.6, p95: 2.8 },
-    { time: "16:00", avg: 1.4, p95: 2.5 },
-    { time: "18:00", avg: 1.2, p95: 2.2 },
-    { time: "20:00", avg: 1.1, p95: 2.0 },
-    { time: "22:00", avg: 1.0, p95: 1.9 },
-  ];
 
   const responseTimeWeekly = [
     { time: "Mon", avg: 1.3, p95: 2.4 },
@@ -357,7 +362,7 @@ export function AnalyticsDashboard() {
 
   const stats = timeRange === "today" ? liveStats : statsData[timeRange];
   const chartData = timeRange === "today" ? trafficChartData : timeRange === "week" ? weeklyData : monthlyData;
-  const responseTimeData = timeRange === "today" ? responseTimeToday : timeRange === "week" ? responseTimeWeekly : responseTimeMonthly;
+  const responseTimeData = timeRange === "today" ? responseTimeChartData : timeRange === "week" ? responseTimeWeekly : responseTimeMonthly;
   const topTopics = topTopicsData[timeRange];
   const languageData = languageDataAll[timeRange];
   const sourceData = sourceDataAll[timeRange];
@@ -380,7 +385,7 @@ export function AnalyticsDashboard() {
                 Last updated: {lastRefreshed.toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short', year: 'numeric' })}
               </span>
               <button
-                onClick={fetchKpis}
+                onClick={() => { fetchKpis(); fetchTraffic(); fetchResponseTime(); }}
                 disabled={kpisLoading}
                 className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity disabled:cursor-not-allowed"
               >
@@ -524,10 +529,9 @@ export function AnalyticsDashboard() {
                 <XAxis dataKey="time" stroke="#9ca3af" fontSize={11} tickLine={false} />
                 <YAxis stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} domain={[0, 3.5]} unit="s" />
                 <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '12px' }} />
-                <Line type="monotone" dataKey="avg" name="Average" stroke="#0B1F3B" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="p95" name="P95" stroke="#ef4444" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 3 }} />
-                {/* 3s SLA line */}
-                <Line type="monotone" dataKey={() => 3} name="SLA (3s)" stroke="#22c55e" strokeWidth={1} strokeDasharray="8 4" dot={false} />
+                <Line type="monotone" dataKey="avg" name="Average" stroke="#0B1F3B" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
+                <Line type="monotone" dataKey="p95" name="P95" stroke="#ef4444" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 3 }} connectNulls={false} />
+                <Line type="monotone" dataKey={() => slaThreshold} name={`SLA (${slaThreshold}s)`} stroke="#22c55e" strokeWidth={1} strokeDasharray="8 4" dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

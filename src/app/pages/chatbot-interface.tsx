@@ -103,6 +103,8 @@ export function ChatbotInterface() {
           setMessages(saved);
           if (savedSession) sessionId.current = savedSession;
           if (savedLocalId) localChatId.current = savedLocalId;
+          // Mark as having messages so New Chat / navigate-away triggers a save
+          if (saved.some((m: Message) => m.isUser)) hasNewMessages.current = true;
         }
         localStorage.removeItem("sanskriti_saathi_active_chat");
       }
