@@ -58,6 +58,7 @@ export function AnalyticsDashboard() {
   const [kpis, setKpis] = useState<KpiData | null>(null);
   const [kpisLoading, setKpisLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
+  const [trafficChartData, setTrafficChartData] = useState<{ time: string; queries: number; users: number }[]>([]);
 
   const fetchKpis = useCallback(() => {
     setKpisLoading(true);
@@ -71,25 +72,29 @@ export function AnalyticsDashboard() {
       .finally(() => setKpisLoading(false));
   }, []);
 
+  const fetchTraffic = useCallback(() => {
+    fetch("/metrics/traffic", { headers: { accept: "application/json" } })
+      .then((r) => r.json())
+      .then((data: { labels: string[]; queries: number[]; users: number[] }) => {
+        setTrafficChartData(
+          data.labels.map((time, i) => ({
+            time,
+            queries: data.queries[i] ?? 0,
+            users: data.users[i] ?? 0,
+          }))
+        );
+      })
+      .catch(() => {/* keep previous data on error */});
+  }, []);
+
   useEffect(() => {
     fetchKpis();
-    const interval = setInterval(fetchKpis, 30_000);
+    fetchTraffic();
+    const interval = setInterval(() => { fetchKpis(); fetchTraffic(); }, 30_000);
     return () => clearInterval(interval);
-  }, [fetchKpis]);
+  }, [fetchKpis, fetchTraffic]);
 
   // --- DATA ---
-  const queriesOverTime = [
-    { time: "00:00", queries: 120, users: 45 },
-    { time: "04:00", queries: 80, users: 22 },
-    { time: "08:00", queries: 450, users: 180 },
-    { time: "10:00", queries: 890, users: 340 },
-    { time: "12:00", queries: 1240, users: 520 },
-    { time: "14:00", queries: 1680, users: 650 },
-    { time: "16:00", queries: 1520, users: 580 },
-    { time: "18:00", queries: 1340, users: 490 },
-    { time: "20:00", queries: 980, users: 370 },
-    { time: "22:00", queries: 560, users: 210 },
-  ];
 
   const weeklyData = [
     { time: "Mon", queries: 8240, users: 3200 },
@@ -351,7 +356,7 @@ export function AnalyticsDashboard() {
       ];
 
   const stats = timeRange === "today" ? liveStats : statsData[timeRange];
-  const chartData = timeRange === "today" ? queriesOverTime : timeRange === "week" ? weeklyData : monthlyData;
+  const chartData = timeRange === "today" ? trafficChartData : timeRange === "week" ? weeklyData : monthlyData;
   const responseTimeData = timeRange === "today" ? responseTimeToday : timeRange === "week" ? responseTimeWeekly : responseTimeMonthly;
   const topTopics = topTopicsData[timeRange];
   const languageData = languageDataAll[timeRange];
