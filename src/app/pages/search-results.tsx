@@ -121,7 +121,12 @@ export function SearchResults() {
     let r = results;
     if (filters.website !== "all") {
       const domain = WEBSITE_DOMAINS[filters.website];
-      if (domain) r = r.filter((res) => res.url.includes(domain));
+      if (domain) r = r.filter((res) => {
+        try {
+          const host = new URL(res.url).hostname.replace(/^www\./, "");
+          return host === domain || host.endsWith("." + domain);
+        } catch { return false; }
+      });
     }
     if (filters.relevance !== "all") {
       const threshold = RELEVANCE_THRESHOLDS[filters.relevance];
