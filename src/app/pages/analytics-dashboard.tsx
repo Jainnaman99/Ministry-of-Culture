@@ -253,7 +253,7 @@ export function AnalyticsDashboard() {
     { label: "Vector Database", status: "operational", uptime: "99.99%" },
     { label: "Web Crawler", status: "operational", uptime: "99.85%" },
     { label: "Search Index", status: "operational", uptime: "99.98%" },
-    { label: "Bhashini API", status: "degraded", uptime: "98.50%" },
+    // { label: "Bhashini API", status: "degraded", uptime: "98.50%" },
   ];
 
   const statsData = {

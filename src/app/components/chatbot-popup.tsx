@@ -495,9 +495,9 @@ export function ChatbotPopup() {
             <a href="#" className="hover:underline">Terms of Use</a>
             <div className="flex items-center gap-1">
               <span className="font-bold" style={{ color: "var(--maroon)", fontFamily: "var(--font-serif)" }}>Sanskriti Saathi</span>
-              <span>·</span>
+              {/* <span>·</span>
               <span className="font-semibold" style={{ color: "#1B3E78" }}>Bhashini</span>
-              <sup>™</sup>
+              <sup>™</sup> */}
             </div>
             <a href="#" className="hover:underline">Privacy Policy</a>
           </div>
