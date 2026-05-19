@@ -28,7 +28,7 @@ export function ChatbotPopup() {
       isUser: false,
       timestamp: "Just now",
       confidence: "High",
-      followUps: ["Tell me about Ajanta caves", "tajmahal kaha he?", "List museums in India"],
+      followUps: ["Tell me about Ajanta caves", "Taj Mahal kahan hai?", "List museums in India"],
     },
   ]);
   const [input, setInput] = useState("");
