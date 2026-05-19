@@ -13,6 +13,7 @@ interface Message {
   isUser: boolean;
   timestamp: string;
   sources?: { title: string; url: string }[];
+  links?: { emoji: string; label: string; url: string }[];
   confidence?: "High" | "Medium" | "Low";
   followUps?: string[];
   isStreaming?: boolean;
@@ -24,9 +25,15 @@ export function ChatbotPopup() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "नमस्ते! 🙏 I'm **Sanskriti Saathi**, your AI companion for India's cultural heritage from the Ministry of Culture. Ask me about monuments, museums, manuscripts, or arts in English or Hindi (typing in English letters works too).",
+      text: "🙏 नमस्ते! Welcome to **Sanskriti Saathi** — your AI guide to India's rich cultural heritage.\nExplore monuments, museums, manuscripts, Vedic traditions, cultural schemes, art, and archives powered by trusted Government of India platforms:",
       isUser: false,
       timestamp: "Just now",
+      links: [
+        { emoji: "🏛️", label: "culture.gov.in",        url: "https://culture.gov.in" },
+        { emoji: "📚", label: "indianculture.gov.in",  url: "https://indianculture.gov.in" },
+        { emoji: "🕉️", label: "vedicheritage.gov.in",  url: "https://vedicheritage.gov.in" },
+        { emoji: "🏺", label: "museumsofindia.gov.in", url: "https://museumsofindia.gov.in" },
+      ],
       confidence: "High",
       followUps: ["Tell me about Ajanta caves", "Taj Mahal kahan hai?", "List museums in India"],
     },
@@ -385,7 +392,7 @@ export function ChatbotPopup() {
                 <ChatBubble {...message} />
 
                 {!message.isUser && message.followUps && message.followUps.length > 0 && !message.isStreaming && (
-                  <div className="ml-9 mb-4 flex flex-wrap gap-1.5">
+                  <div className="ml-9 -mt-3 mb-2 flex flex-wrap gap-1.5">
                     {message.followUps.map((fq, i) => (
                       <button
                         key={i}

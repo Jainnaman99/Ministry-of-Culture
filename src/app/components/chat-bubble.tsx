@@ -8,7 +8,7 @@ interface ChatBubbleProps {
   isUser: boolean;
   timestamp?: string;
   sources?: { title: string; url: string }[];
-
+  links?: { emoji: string; label: string; url: string }[];
   id?: string;
 }
 
@@ -22,7 +22,7 @@ function renderFormattedText(text: string) {
   });
 }
 
-export function ChatBubble({ text, message, isUser, timestamp, sources }: ChatBubbleProps) {
+export function ChatBubble({ text, message, isUser, timestamp, sources, links }: ChatBubbleProps) {
   const content = text || message || "";
 
 
@@ -51,6 +51,30 @@ export function ChatBubble({ text, message, isUser, timestamp, sources }: ChatBu
           }}
         >
           <p className="whitespace-pre-wrap leading-relaxed text-[14px]">{renderFormattedText(content)}</p>
+
+          {/* Portal link buttons */}
+          {!isUser && links && links.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {links.map((link, i) => (
+                <a
+                  key={i}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all hover:opacity-80 active:scale-95"
+                  style={{
+                    backgroundColor: '#FFF6E5',
+                    border: '1px solid #e8d5a3',
+                    color: 'var(--maroon)',
+                  }}
+                >
+                  <span className="leading-none">{link.emoji}</span>
+                  <span>{link.label}</span>
+                  <ExternalLink className="h-2.5 w-2.5 opacity-40 flex-shrink-0" />
+                </a>
+              ))}
+            </div>
+          )}
 
 {/* Sources */}
           {!isUser && sources && sources.length > 0 && (
