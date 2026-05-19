@@ -61,6 +61,9 @@ export function AnalyticsDashboard() {
   const [trafficChartData, setTrafficChartData] = useState<{ time: string; queries: number; users: number }[]>([]);
   const [responseTimeChartData, setResponseTimeChartData] = useState<{ time: string; avg: number | null; p95: number | null }[]>([]);
   const [slaThreshold, setSlaThreshold] = useState(3.0);
+  const [topTopicsLiveData, setTopTopicsLiveData] = useState<{ topic: string; count: number; pct: number }[]>([]);
+  const [languageDistLiveData, setLanguageDistLiveData] = useState<{ name: string; value: number; color: string }[]>([]);
+  const [portalQueriesLiveData, setPortalQueriesLiveData] = useState<{ name: string; queries: number; pct: number }[]>([]);
 
   const fetchKpis = useCallback(() => {
     setKpisLoading(true);
@@ -105,11 +108,54 @@ export function AnalyticsDashboard() {
       .catch(() => {/* keep previous data on error */});
   }, []);
 
+  const LANG_COLORS: Record<string, string> = {
+    English: "#0B1F3B", Hindi: "#C6A75E", Telugu: "#8B7355", Tamil: "#2d4a6d",
+  };
+
+  const fetchLanguageDist = useCallback(() => {
+    fetch("/metrics/language-distribution", { headers: { accept: "application/json" } })
+      .then(r => r.json())
+      .then((data: { distribution: { language: string; count: number; pct: number }[] }) => {
+        const items = (data.distribution ?? [])
+          .filter(d => d.pct > 0)
+          .map(d => ({
+            name: d.language,
+            value: d.pct,
+            color: LANG_COLORS[d.language] ?? "#94a3b8",
+          }));
+        setLanguageDistLiveData(items);
+      })
+      .catch(() => {});
+  }, []);
+
+  const fetchPortalQueries = useCallback(() => {
+    fetch("/metrics/portal-queries", { headers: { accept: "application/json" } })
+      .then(r => r.json())
+      .then((data: { portals: { domain: string; count: number; pct: number }[] }) => {
+        setPortalQueriesLiveData(
+          (data.portals ?? []).map(p => ({ name: p.domain, queries: p.count, pct: p.pct }))
+        );
+      })
+      .catch(() => {});
+  }, []);
+
+  const fetchTopTopics = useCallback(() => {
+    fetch("/metrics/top-topics?limit=10", { headers: { accept: "application/json" } })
+      .then(r => r.json())
+      .then((data: { date: string; topics: { topic: string; count: number; pct: number }[] }) => {
+        setTopTopicsLiveData(data.topics ?? []);
+      })
+      .catch(() => {/* keep previous data on error */});
+  }, []);
+
   useEffect(() => {
     fetchKpis();
     fetchTraffic();
     fetchResponseTime();
-  }, [fetchKpis, fetchTraffic, fetchResponseTime]);
+    fetchTopTopics();
+    fetchLanguageDist();
+    fetchPortalQueries();
+  }, [fetchKpis, fetchTraffic, fetchResponseTime, fetchTopTopics, fetchLanguageDist, fetchPortalQueries]);
 
   // --- DATA ---
 
@@ -363,9 +409,9 @@ export function AnalyticsDashboard() {
   const stats = timeRange === "today" ? liveStats : statsData[timeRange];
   const chartData = timeRange === "today" ? trafficChartData : timeRange === "week" ? weeklyData : monthlyData;
   const responseTimeData = timeRange === "today" ? responseTimeChartData : timeRange === "week" ? responseTimeWeekly : responseTimeMonthly;
-  const topTopics = topTopicsData[timeRange];
-  const languageData = languageDataAll[timeRange];
-  const sourceData = sourceDataAll[timeRange];
+  const topTopics = timeRange === "today" ? topTopicsLiveData : topTopicsData[timeRange];
+  const languageData = timeRange === "today" ? languageDistLiveData : languageDataAll[timeRange];
+  const sourceData = timeRange === "today" ? portalQueriesLiveData : sourceDataAll[timeRange];
   const recentQueries = recentQueriesData[timeRange];
 
   return (
@@ -385,7 +431,7 @@ export function AnalyticsDashboard() {
                 Last updated: {lastRefreshed.toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short', year: 'numeric' })}
               </span>
               <button
-                onClick={() => { fetchKpis(); fetchTraffic(); fetchResponseTime(); }}
+                onClick={() => { fetchKpis(); fetchTraffic(); fetchResponseTime(); fetchTopTopics(); fetchLanguageDist(); fetchPortalQueries(); }}
                 disabled={kpisLoading}
                 className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity disabled:cursor-not-allowed"
               >
@@ -743,7 +789,7 @@ export function AnalyticsDashboard() {
         {/* Footer */}
         <div className="text-center py-4">
           <p className="text-[11px]" style={{ color: '#9ca3af' }}>
-            Ministry of Culture AI Dashboard &middot; Data refreshed every 30 seconds &middot; Hosted on MeitY-empanelled CSP &middot; NIC/MeghRaj compliant
+            Ministry of Culture AI Dashboard &middot; Data updated on demand via Refresh &middot; Hosted on MeitY-empanelled CSP &middot; NIC/MeghRaj compliant
           </p>
         </div>
       </main>
